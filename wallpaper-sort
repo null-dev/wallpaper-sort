@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+trim() {
+	local var="$*"
+	# remove leading whitespace characters
+	var="${var#"${var%%[![:space:]]*}"}"
+	# remove trailing whitespace characters
+	var="${var%"${var##*[![:space:]]}"}"   
+	echo -n "$var"
+}
+
+DESKTOP_DIR="$1"
+PHONE_DIR="$2"
+
+function sort() {
+	DIMENS="$(file "$1")"
+	DIMENS="${DIMENS#*:}"
+	IS_IMAGE=false
+	printf "Sorting image '$1'... "
+
+	IFS=',' read -ra ADDR <<< "$DIMENS"
+	for PROP in "${ADDR[@]}"; do
+		TRIMMED="$(trim "$PROP")"
+		if [[ "$TRIMMED" =~ ^[0-9]+\ ?x\ ?[0-9]+$ ]]; then
+			WIDTH="$(trim $(cut -dx -f1 <<< "$TRIMMED"))"
+			HEIGHT="$(trim $(cut -dx -f2 <<< "$TRIMMED"))"
+
+			if (( WIDTH > HEIGHT )); then
+				mv "$1" "$DESKTOP_DIR/"
+				printf "Desktop"
+			elif (( HEIGHT > WIDTH )); then
+				mv "$1" "$PHONE_DIR/"
+				printf "Phone"
+			else
+				printf "Failed, image is square!"
+			fi
+			IS_IMAGE=true
+
+			echo " ($WIDTH x $HEIGHT)"
+		fi
+	done
+
+	if ! $IS_IMAGE; then
+		echo "Failed, not an image!"
+	fi
+}
+
+if (( $# < 3 )); then
+	echo "Usage: ./wallpaper-sort <DESKTOP_DIR> <PHONE_DIR> [FILE]..."
+	echo -e "\tDESKTOP_DIR: The location to move the desktop wallpapers to"
+	echo -e "\tPHONE_DIR: The location to move the phone wallpapers to"
+	echo -e "\tFILE: The images to sort"
+	exit -1
+fi
+
+mkdir -p "$DESKTOP_DIR"
+mkdir -p "$PHONE_DIR"
+
+shift; shift;
+for item in "$@" ; do
+	sort "$item"
+done
